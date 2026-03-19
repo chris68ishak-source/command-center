@@ -208,7 +208,7 @@ export default function Dashboard() {
               className="bg-gray-900 rounded-xl border border-gray-800 border-dashed p-8 text-center cursor-pointer hover:border-gray-600 transition-colors"
             >
               <p className="text-gray-500 text-sm">
-                {loadingBriefing ? "Generating your briefing..." : "Click Refresh Briefing to generate today&apos;s summary"}
+                {loadingBriefing ? "Generating your briefing..." : "Click Refresh Briefing to generate today's summary"}
               </p>
             </div>
           )}
