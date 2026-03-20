@@ -237,17 +237,17 @@ export default function QuotesPage() {
                       <h3 className="text-sm font-medium text-white">{quote.customer_name}</h3>
                       <p className="text-xs text-gray-400">{quote.project_type} · ${Number(quote.quote_amount || 0).toLocaleString()}{quote.description ? ` · ${quote.description}` : ""}</p>
                     </div>
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full border ${statusColor(quote.status)}`}>
-                      {quote.status === "followed_up" ? "Followed Up" : quote.status.charAt(0).toUpperCase() + quote.status.slice(1)}
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full border ${statusColor(quote.status || "pending")}`}>
+                      {quote.status === "followed_up" ? "Followed Up" : (quote.status || "pending").charAt(0).toUpperCase() + (quote.status || "pending").slice(1)}
                     </span>
-                    {quote.status === "pending" && daysSince(quote.sent_at) >= 2 && (
+                    {(quote.status === "pending" || !quote.status) && daysSince(quote.sent_at) >= 2 && (
                       <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-900/30 text-red-400 border border-red-800">
                         {daysSince(quote.sent_at)}d no reply
                       </span>
                     )}
                   </div>
                   <div className="flex items-center gap-2">
-                    {(quote.status === "pending" || quote.status === "followed_up") && (
+                    {(!quote.status || quote.status === "pending" || quote.status === "followed_up") && (
                       <>
                         <button onClick={() => sendFollowUp(quote)} disabled={sendingFollowUp === quote.id}
                           className="text-xs px-3 py-1.5 rounded-md bg-orange-600 hover:bg-orange-500 text-white transition-colors disabled:opacity-50">
