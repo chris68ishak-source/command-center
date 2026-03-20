@@ -43,9 +43,9 @@ export default function QuotesPage() {
       ]);
       const quotesData = await quotesRes.json();
       const statsData = await statsRes.json();
-      if (quotesData.success) setQuotes(quotesData.quotes);
-      if (statsData.success) setStats(statsData.stats);
-    } catch { /* silent */ }
+      if (quotesData.success && Array.isArray(quotesData.quotes)) setQuotes(quotesData.quotes);
+      if (statsData.success && statsData.stats) setStats(statsData.stats);
+    } catch (err) { console.error("Load quotes error:", err); }
     finally { setLoading(false); }
   }, []);
 
@@ -64,7 +64,7 @@ export default function QuotesPage() {
         setShowAddForm(false);
         loadQuotes();
       }
-    } catch { /* silent */ }
+    } catch (err) { console.error("Add quote error:", err); }
   };
 
   const sendFollowUp = async (quote: Quote) => {
@@ -86,7 +86,7 @@ export default function QuotesPage() {
         });
         loadQuotes();
       }
-    } catch { /* silent */ }
+    } catch (err) { console.error("Follow up error:", err); }
     finally { setSendingFollowUp(null); }
   };
 
@@ -114,10 +114,15 @@ export default function QuotesPage() {
         }
         loadQuotes();
       }
-    } catch { /* silent */ }
+    } catch (err) { console.error("Update status error:", err); }
   };
 
-  const daysSince = (date: string) => Math.floor((Date.now() - new Date(date).getTime()) / (1000 * 60 * 60 * 24));
+  const daysSince = (date: string) => {
+    if (!date) return 0;
+    const d = new Date(date).getTime();
+    if (isNaN(d)) return 0;
+    return Math.floor((Date.now() - d) / (1000 * 60 * 60 * 24));
+  };
 
   const statusColor = (status: string) => {
     switch (status) {
@@ -230,7 +235,7 @@ export default function QuotesPage() {
                   <div className="flex items-center gap-4">
                     <div>
                       <h3 className="text-sm font-medium text-white">{quote.customer_name}</h3>
-                      <p className="text-xs text-gray-400">{quote.project_type} · ${Number(quote.quote_amount).toLocaleString()}{quote.description ? ` · ${quote.description}` : ""}</p>
+                      <p className="text-xs text-gray-400">{quote.project_type} · ${Number(quote.quote_amount || 0).toLocaleString()}{quote.description ? ` · ${quote.description}` : ""}</p>
                     </div>
                     <span className={`text-[10px] px-2 py-0.5 rounded-full border ${statusColor(quote.status)}`}>
                       {quote.status === "followed_up" ? "Followed Up" : quote.status.charAt(0).toUpperCase() + quote.status.slice(1)}

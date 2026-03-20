@@ -26,7 +26,7 @@ export default function ReviewsPage() {
       const res = await fetch("/api/db/reviews");
       const data = await res.json();
       if (data.success) setHistory(data.reviews);
-    } catch { /* silent */ }
+    } catch (err) { console.error("Reviews error:", err); }
     finally { setLoading(false); }
   }, []);
 
@@ -43,7 +43,7 @@ export default function ReviewsPage() {
         setForm({ customerName: "", customerPhone: "", projectType: "" });
         loadHistory(); // Reload from DB
       } else { setResult({ error: data.error || "Something went wrong" }); }
-    } catch { setResult({ error: "Network error — please try again" }); }
+    } catch (err) { console.error("Send review error:", err); setResult({ error: "Network error — please try again" }); }
     finally { setSending(false); }
   };
 

@@ -53,7 +53,7 @@ export default function JobsPage() {
       const statsData = await statsRes.json();
       if (jobsData.success) setJobs(jobsData.jobs);
       if (statsData.success) setStats(statsData.stats);
-    } catch { /* silent */ }
+    } catch (err) { console.error("Jobs error:", err); }
     finally { setLoading(false); }
   }, [filter]);
 
@@ -72,7 +72,7 @@ export default function JobsPage() {
         setShowAddForm(false);
         loadJobs();
       }
-    } catch { /* silent */ }
+    } catch (err) { console.error("Jobs error:", err); }
   };
 
   const updateJob = async (id: number, updates: Record<string, string | number | undefined>) => {
@@ -83,7 +83,7 @@ export default function JobsPage() {
       });
       const data = await res.json();
       if (data.success) { setEditingId(null); loadJobs(); }
-    } catch { /* silent */ }
+    } catch (err) { console.error("Jobs error:", err); }
   };
 
   const sendReviewRequest = async (job: Job) => {
@@ -98,7 +98,7 @@ export default function JobsPage() {
       });
       const data = await res.json();
       if (data.success) { loadJobs(); }
-    } catch { /* silent */ }
+    } catch (err) { console.error("Jobs error:", err); }
     finally { setSendingReview(null); }
   };
 
