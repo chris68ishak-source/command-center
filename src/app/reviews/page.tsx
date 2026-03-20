@@ -1,20 +1,36 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import PageHeader from "@/components/PageHeader";
 
-interface ReviewLog {
-  id: string;
-  customerName: string;
-  message: string;
-  sentAt: string;
+interface ReviewRequest {
+  id: number;
+  job_id?: number;
+  customer_name: string;
+  customer_phone: string;
+  project_type: string;
+  message_sent: string;
+  twilio_sid?: string;
+  sent_at: string;
 }
 
 export default function ReviewsPage() {
   const [form, setForm] = useState({ customerName: "", customerPhone: "", projectType: "" });
   const [result, setResult] = useState<{ success?: boolean; message?: string; error?: string } | null>(null);
   const [sending, setSending] = useState(false);
-  const [history, setHistory] = useState<ReviewLog[]>([]);
+  const [history, setHistory] = useState<ReviewRequest[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const loadHistory = useCallback(async () => {
+    try {
+      const res = await fetch("/api/db/reviews");
+      const data = await res.json();
+      if (data.success) setHistory(data.reviews);
+    } catch { /* silent */ }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { loadHistory(); }, [loadHistory]);
 
   const sendRequest = async () => {
     if (!form.customerName || !form.customerPhone || !form.projectType) { setResult({ error: "Please fill in all fields" }); return; }
@@ -24,8 +40,8 @@ export default function ReviewsPage() {
       const data = await res.json();
       if (data.success) {
         setResult({ success: true, message: data.messageSent });
-        setHistory([{ id: `R-${Date.now()}`, customerName: form.customerName, message: data.messageSent, sentAt: new Date().toISOString() }, ...history]);
         setForm({ customerName: "", customerPhone: "", projectType: "" });
+        loadHistory(); // Reload from DB
       } else { setResult({ error: data.error || "Something went wrong" }); }
     } catch { setResult({ error: "Network error — please try again" }); }
     finally { setSending(false); }
@@ -61,28 +77,42 @@ export default function ReviewsPage() {
           </button>
           {result && (
             <div className={`mt-4 p-3 rounded-lg text-sm ${result.success ? "bg-green-900/30 border border-green-800 text-green-300" : "bg-red-900/30 border border-red-800 text-red-300"}`}>
-              {result.success ? (<><p className="font-medium mb-1">✅ SMS sent successfully</p><p className="text-xs text-green-400 font-mono bg-green-900/30 p-2 rounded">{result.message}</p></>) : (<p>❌ {result.error}</p>)}
+              {result.success ? (<><p className="font-medium mb-1">SMS sent successfully</p><p className="text-xs text-green-400 font-mono bg-green-900/30 p-2 rounded">{result.message}</p></>) : (<p>{result.error}</p>)}
             </div>
           )}
         </div>
 
-        {/* History */}
-        {history.length > 0 && (
-          <div>
-            <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4">Sent This Session</h2>
+        {/* History from Database */}
+        <div>
+          <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4">Review Request History</h2>
+          {loading ? (
+            <div className="bg-gray-900 rounded-xl border border-gray-800 p-12 text-center">
+              <p className="text-gray-500 text-sm">Loading history...</p>
+            </div>
+          ) : history.length === 0 ? (
+            <div className="bg-gray-900 rounded-xl border border-gray-800 border-dashed p-12 text-center">
+              <p className="text-gray-500 text-sm">No review requests sent yet. Send your first one above, or use the &quot;Request Review&quot; button on completed jobs.</p>
+            </div>
+          ) : (
             <div className="space-y-2">
-              {history.map((log) => (
-                <div key={log.id} className="bg-gray-900 rounded-xl border border-gray-800 p-4 flex items-start justify-between">
-                  <div>
-                    <p className="text-sm text-white font-medium">{log.customerName}</p>
-                    <p className="text-xs text-gray-400 font-mono mt-1">{log.message}</p>
+              {history.map((review) => (
+                <div key={review.id} className="bg-gray-900 rounded-xl border border-gray-800 p-4 flex items-start justify-between">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-3">
+                      <p className="text-sm text-white font-medium">{review.customer_name}</p>
+                      <span className="text-[10px] text-gray-500">{review.project_type}</span>
+                      {review.twilio_sid && (
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-900/30 text-green-400 border border-green-800">Delivered</span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-400 font-mono mt-1 truncate">{review.message_sent}</p>
                   </div>
-                  <span className="text-[10px] text-gray-500 shrink-0">{new Date(log.sentAt).toLocaleTimeString()}</span>
+                  <span className="text-[10px] text-gray-500 shrink-0 ml-4">{new Date(review.sent_at).toLocaleDateString()}</span>
                 </div>
               ))}
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );

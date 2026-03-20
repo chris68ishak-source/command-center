@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sendReviewRequest } from "@/lib/agents/reviewRequester";
+import { logReviewRequest } from "@/lib/db/queries";
 import { ReviewRequest } from "@/types";
 
 // POST /api/agents/review-requester
@@ -38,6 +39,19 @@ export async function POST(request: NextRequest) {
         { error: result.error || "Failed to send review request" },
         { status: 500 }
       );
+    }
+
+    // Log to database
+    try {
+      await logReviewRequest({
+        customerName: body.customerName,
+        customerPhone: body.customerPhone,
+        projectType: body.projectType,
+        messageSent: result.message,
+        twilioSid: result.sid,
+      });
+    } catch {
+      // Don't fail the request if logging fails
     }
 
     return NextResponse.json({
