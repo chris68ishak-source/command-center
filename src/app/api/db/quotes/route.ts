@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createQuote, getQuotes, getQuoteStats, updateQuoteStatus, updateQuoteFollowUp } from "@/lib/db/queries";
 import { logFollowUp } from "@/lib/db/queries";
+import { requireAuth } from "@/lib/auth";
 
 // GET /api/db/quotes — list all quotes, optionally filter by status
 export async function GET(request: NextRequest) {
+  const denied = requireAuth(request);
+  if (denied) return denied;
+
   try {
     const status = request.nextUrl.searchParams.get("status") || undefined;
     const stats = request.nextUrl.searchParams.get("stats");
@@ -17,12 +21,15 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: true, quotes });
   } catch (error) {
     console.error("Get quotes error:", error);
-    return NextResponse.json({ error: String(error) }, { status: 500 });
+    return NextResponse.json({ error: "Failed to fetch quotes" }, { status: 500 });
   }
 }
 
 // POST /api/db/quotes — create a new quote or update existing
 export async function POST(request: NextRequest) {
+  const denied = requireAuth(request);
+  if (denied) return denied;
+
   try {
     const body = await request.json();
 
@@ -50,6 +57,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, quote });
   } catch (error) {
     console.error("Quote operation error:", error);
-    return NextResponse.json({ error: String(error) }, { status: 500 });
+    return NextResponse.json({ error: "Quote operation failed" }, { status: 500 });
   }
 }

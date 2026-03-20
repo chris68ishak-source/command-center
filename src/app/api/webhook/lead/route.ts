@@ -5,10 +5,10 @@ import { createQuote } from "@/lib/db/queries";
 // Called automatically when someone submits the free quote form
 export async function POST(request: NextRequest) {
   try {
-    // Verify webhook secret to prevent spam
+    // Verify webhook secret — ALWAYS required in production
     const authHeader = request.headers.get("authorization");
     const secret = process.env.WEBHOOK_SECRET;
-    if (secret && authHeader !== `Bearer ${secret}`) {
+    if (!secret || authHeader !== `Bearer ${secret}`) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -42,6 +42,6 @@ export async function POST(request: NextRequest) {
     }, { status: 201 });
   } catch (error) {
     console.error("[Webhook] Lead capture error:", error);
-    return NextResponse.json({ error: String(error) }, { status: 500 });
+    return NextResponse.json({ error: "Failed to capture lead" }, { status: 500 });
   }
 }

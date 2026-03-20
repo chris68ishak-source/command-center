@@ -1,18 +1,20 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@vercel/postgres";
 import { initializeDatabase } from "@/lib/db/schema";
+import { requireAdminAuth } from "@/lib/auth";
 
 // GET /api/db/migrate — drop old tables and recreate with correct schema
-// WARNING: This deletes all data. Only use for initial setup.
-export async function GET() {
+// WARNING: This deletes all data. Requires CRON_SECRET bearer token.
+export async function GET(request: NextRequest) {
+  const denied = requireAdminAuth(request);
+  if (denied) return denied;
+
   try {
-    // Drop tables in reverse dependency order
     await sql`DROP TABLE IF EXISTS follow_up_log CASCADE`;
     await sql`DROP TABLE IF EXISTS review_requests CASCADE`;
     await sql`DROP TABLE IF EXISTS jobs CASCADE`;
     await sql`DROP TABLE IF EXISTS quotes CASCADE`;
 
-    // Recreate with correct schema
     const result = await initializeDatabase();
 
     return NextResponse.json({
@@ -22,6 +24,6 @@ export async function GET() {
     });
   } catch (error) {
     console.error("Migration error:", error);
-    return NextResponse.json({ error: String(error) }, { status: 500 });
+    return NextResponse.json({ error: "Migration failed" }, { status: 500 });
   }
 }
