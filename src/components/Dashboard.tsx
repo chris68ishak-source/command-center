@@ -17,14 +17,23 @@ interface ReviewForm {
   projectType: string;
 }
 
+interface FollowUpForm {
+  customerName: string;
+  customerPhone: string;
+  quoteAmount: string;
+  projectType: string;
+  sentAt: string;
+}
+
+interface ContentResult {
+  blogPost?: { title: string; body: string; metaDescription: string };
+  socialCaptions?: { day: string; platform: string; caption: string; hashtags: string[] }[];
+  googleBusinessPost?: string;
+  newsletterBlurb?: string;
+  topic?: string;
+}
+
 const agents: AgentStatus[] = [
-  {
-    name: "Review Requester",
-    phase: 1,
-    status: "live",
-    description: "Sends personalized SMS after job completion",
-    icon: "⭐",
-  },
   {
     name: "Morning Briefing",
     phase: 1,
@@ -33,16 +42,23 @@ const agents: AgentStatus[] = [
     icon: "☀️",
   },
   {
+    name: "Review Requester",
+    phase: 1,
+    status: "live",
+    description: "Sends personalized SMS after job completion",
+    icon: "⭐",
+  },
+  {
     name: "Quote Follow-Up",
-    phase: 3,
-    status: "coming_soon",
-    description: "Auto-drafts follow-ups for quotes >48h with no reply",
+    phase: 2,
+    status: "live",
+    description: "AI follow-up SMS for quotes with no reply",
     icon: "📋",
   },
   {
     name: "Content Generator",
     phase: 2,
-    status: "coming_soon",
+    status: "live",
     description: "Weekly blog post, 7 social captions, GBP post & newsletter",
     icon: "✍️",
   },
@@ -70,6 +86,7 @@ const agents: AgentStatus[] = [
 ];
 
 export default function Dashboard() {
+  // Review Request state
   const [reviewForm, setReviewForm] = useState<ReviewForm>({
     customerName: "",
     customerPhone: "",
@@ -82,6 +99,7 @@ export default function Dashboard() {
   } | null>(null);
   const [sendingReview, setSendingReview] = useState(false);
 
+  // Morning Briefing state
   const [briefing, setBriefing] = useState<{
     summary?: string;
     priorities?: string[];
@@ -91,6 +109,27 @@ export default function Dashboard() {
     todayJobs?: string[];
   } | null>(null);
   const [loadingBriefing, setLoadingBriefing] = useState(false);
+
+  // Quote Follow-Up state
+  const [followUpForm, setFollowUpForm] = useState<FollowUpForm>({
+    customerName: "",
+    customerPhone: "",
+    quoteAmount: "",
+    projectType: "",
+    sentAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+  });
+  const [followUpResult, setFollowUpResult] = useState<{
+    success?: boolean;
+    message?: string;
+    error?: string;
+  } | null>(null);
+  const [sendingFollowUp, setSendingFollowUp] = useState(false);
+
+  // Content Generator state
+  const [contentTopic, setContentTopic] = useState("");
+  const [contentResult, setContentResult] = useState<ContentResult | null>(null);
+  const [generatingContent, setGeneratingContent] = useState(false);
+  const [activeContentTab, setActiveContentTab] = useState<"blog" | "social" | "gbp" | "newsletter">("blog");
 
   const sendReviewRequest = async () => {
     if (!reviewForm.customerName || !reviewForm.customerPhone || !reviewForm.projectType) {
@@ -133,6 +172,65 @@ export default function Dashboard() {
     }
   };
 
+  const sendFollowUp = async () => {
+    if (!followUpForm.customerName || !followUpForm.customerPhone || !followUpForm.quoteAmount || !followUpForm.projectType) {
+      setFollowUpResult({ error: "Please fill in all fields" });
+      return;
+    }
+    setSendingFollowUp(true);
+    setFollowUpResult(null);
+    try {
+      const res = await fetch("/api/agents/quote-follow-up", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...followUpForm,
+          quoteAmount: parseFloat(followUpForm.quoteAmount),
+          sentAt: new Date(followUpForm.sentAt).toISOString(),
+          jobId: `Q-${Date.now()}`,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setFollowUpResult({ success: true, message: data.messageSent });
+        setFollowUpForm({
+          customerName: "",
+          customerPhone: "",
+          quoteAmount: "",
+          projectType: "",
+          sentAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+        });
+      } else {
+        setFollowUpResult({ error: data.error || "Something went wrong" });
+      }
+    } catch {
+      setFollowUpResult({ error: "Network error — please try again" });
+    } finally {
+      setSendingFollowUp(false);
+    }
+  };
+
+  const generateContent = async () => {
+    setGeneratingContent(true);
+    setContentResult(null);
+    try {
+      const res = await fetch("/api/agents/content-generator", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ topic: contentTopic || undefined }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setContentResult(data.content);
+        setActiveContentTab("blog");
+      }
+    } catch {
+      // silent fail
+    } finally {
+      setGeneratingContent(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-950 text-white">
       {/* Header */}
@@ -144,7 +242,7 @@ export default function Dashboard() {
           </div>
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
-            <span className="text-xs text-gray-400">All systems operational</span>
+            <span className="text-xs text-gray-400">4 agents live</span>
           </div>
         </div>
       </header>
@@ -287,12 +385,212 @@ export default function Dashboard() {
           </div>
         </section>
 
+        {/* Quote Follow-Up */}
+        <section>
+          <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4">
+            📋 Quote Follow-Up
+          </h2>
+          <div className="bg-gray-900 rounded-xl border border-gray-800 p-5">
+            <p className="text-xs text-gray-400 mb-4">
+              Enter a quote that hasn&apos;t gotten a reply — Claude will craft a natural follow-up SMS.
+            </p>
+            <div className="grid grid-cols-5 gap-3 mb-4">
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">Customer Name</label>
+                <input
+                  type="text"
+                  placeholder="Mike Chen"
+                  value={followUpForm.customerName}
+                  onChange={(e) => setFollowUpForm({ ...followUpForm, customerName: e.target.value })}
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-blue-500 transition-colors"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">Phone</label>
+                <input
+                  type="tel"
+                  placeholder="+16045551234"
+                  value={followUpForm.customerPhone}
+                  onChange={(e) => setFollowUpForm({ ...followUpForm, customerPhone: e.target.value })}
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-blue-500 transition-colors"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">Quote Amount</label>
+                <input
+                  type="number"
+                  placeholder="4500"
+                  value={followUpForm.quoteAmount}
+                  onChange={(e) => setFollowUpForm({ ...followUpForm, quoteAmount: e.target.value })}
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-blue-500 transition-colors"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">Project Type</label>
+                <input
+                  type="text"
+                  placeholder="fence install"
+                  value={followUpForm.projectType}
+                  onChange={(e) => setFollowUpForm({ ...followUpForm, projectType: e.target.value })}
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-blue-500 transition-colors"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">Quote Sent</label>
+                <input
+                  type="date"
+                  value={followUpForm.sentAt}
+                  onChange={(e) => setFollowUpForm({ ...followUpForm, sentAt: e.target.value })}
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors"
+                />
+              </div>
+            </div>
+
+            <button
+              onClick={sendFollowUp}
+              disabled={sendingFollowUp}
+              className="bg-orange-600 hover:bg-orange-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {sendingFollowUp ? "Sending..." : "Send Follow-Up"}
+            </button>
+
+            {followUpResult && (
+              <div
+                className={`mt-4 p-3 rounded-lg text-sm ${
+                  followUpResult.success
+                    ? "bg-green-900/30 border border-green-800 text-green-300"
+                    : "bg-red-900/30 border border-red-800 text-red-300"
+                }`}
+              >
+                {followUpResult.success ? (
+                  <>
+                    <p className="font-medium mb-1">✅ Follow-up sent</p>
+                    <p className="text-xs text-green-400 font-mono bg-green-900/30 p-2 rounded">
+                      {followUpResult.message}
+                    </p>
+                  </>
+                ) : (
+                  <p>❌ {followUpResult.error}</p>
+                )}
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* Content Generator */}
+        <section>
+          <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4">
+            ✍️ Content Generator
+          </h2>
+          <div className="bg-gray-900 rounded-xl border border-gray-800 p-5">
+            <p className="text-xs text-gray-400 mb-4">
+              Generate a full week of content — blog post, 7 social captions, Google Business post, and newsletter blurb.
+            </p>
+            <div className="flex gap-3 mb-4">
+              <input
+                type="text"
+                placeholder="Custom topic (leave empty for seasonal auto-pick)"
+                value={contentTopic}
+                onChange={(e) => setContentTopic(e.target.value)}
+                className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-purple-500 transition-colors"
+              />
+              <button
+                onClick={generateContent}
+                disabled={generatingContent}
+                className="bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+              >
+                {generatingContent ? "Generating..." : "Generate Week"}
+              </button>
+            </div>
+
+            {contentResult && (
+              <div className="space-y-4">
+                {/* Content Tabs */}
+                <div className="flex gap-1 bg-gray-800 rounded-lg p-1">
+                  {[
+                    { key: "blog" as const, label: "Blog Post" },
+                    { key: "social" as const, label: "Social (7 days)" },
+                    { key: "gbp" as const, label: "Google Business" },
+                    { key: "newsletter" as const, label: "Newsletter" },
+                  ].map((tab) => (
+                    <button
+                      key={tab.key}
+                      onClick={() => setActiveContentTab(tab.key)}
+                      className={`flex-1 text-xs py-2 px-3 rounded-md transition-colors ${
+                        activeContentTab === tab.key
+                          ? "bg-purple-600 text-white"
+                          : "text-gray-400 hover:text-gray-200"
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Blog Post */}
+                {activeContentTab === "blog" && contentResult.blogPost && (
+                  <div className="space-y-3">
+                    <h3 className="text-white font-medium text-sm">{contentResult.blogPost.title}</h3>
+                    <p className="text-xs text-purple-400 italic">{contentResult.blogPost.metaDescription}</p>
+                    <div className="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap max-h-64 overflow-y-auto bg-gray-800/50 rounded-lg p-4">
+                      {contentResult.blogPost.body}
+                    </div>
+                  </div>
+                )}
+
+                {/* Social Captions */}
+                {activeContentTab === "social" && contentResult.socialCaptions && (
+                  <div className="space-y-2 max-h-80 overflow-y-auto">
+                    {contentResult.socialCaptions.map((post, i) => (
+                      <div key={i} className="bg-gray-800/50 rounded-lg p-3">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-xs font-medium text-purple-400">{post.day}</span>
+                          <span className="text-xs text-gray-500">·</span>
+                          <span className="text-xs text-gray-400">{post.platform}</span>
+                        </div>
+                        <p className="text-sm text-gray-300">{post.caption}</p>
+                        {post.hashtags.length > 0 && (
+                          <p className="text-xs text-blue-400 mt-1">
+                            {post.hashtags.map((h) => `#${h}`).join(" ")}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Google Business Post */}
+                {activeContentTab === "gbp" && contentResult.googleBusinessPost && (
+                  <div className="bg-gray-800/50 rounded-lg p-4">
+                    <p className="text-sm text-gray-300 leading-relaxed">
+                      {contentResult.googleBusinessPost}
+                    </p>
+                  </div>
+                )}
+
+                {/* Newsletter */}
+                {activeContentTab === "newsletter" && contentResult.newsletterBlurb && (
+                  <div className="bg-gray-800/50 rounded-lg p-4">
+                    <p className="text-sm text-gray-300 leading-relaxed">
+                      {contentResult.newsletterBlurb}
+                    </p>
+                  </div>
+                )}
+
+                <p className="text-xs text-gray-600">
+                  Topic: {contentResult.topic} · Copy any text above and paste into your platforms
+                </p>
+              </div>
+            )}
+          </div>
+        </section>
+
         {/* Agent Status Grid */}
         <section>
           <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4">
             🤖 Agent Status
           </h2>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-4 gap-3">
             {agents.map((agent) => (
               <div
                 key={agent.name}
