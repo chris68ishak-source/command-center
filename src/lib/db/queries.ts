@@ -183,3 +183,110 @@ export async function getFollowUpsForQuote(quoteId: number) {
   const result = await sql`SELECT * FROM follow_up_log WHERE quote_id = ${quoteId} ORDER BY sent_at DESC`;
   return result.rows;
 }
+
+// ─────────────────────────────────────────────────────────────
+//  Contact Queries
+// ─────────────────────────────────────────────────────────────
+
+export async function createContact(data: {
+  name: string;
+  email: string;
+  phone?: string;
+  city?: string;
+  source?: string;
+  tags?: string;
+}) {
+  const result = await sql`
+    INSERT INTO contacts (name, email, phone, city, source, tags)
+    VALUES (${data.name}, ${data.email.toLowerCase()}, ${data.phone || null}, ${data.city || null}, ${data.source || 'manual'}, ${data.tags || ''})
+    ON CONFLICT (email) DO UPDATE SET
+      name = COALESCE(NULLIF(${data.name}, ''), contacts.name),
+      phone = COALESCE(${data.phone || null}, contacts.phone),
+      city = COALESCE(${data.city || null}, contacts.city)
+    RETURNING *
+  `;
+  return result.rows[0];
+}
+
+export async function getContacts(subscribedOnly = false) {
+  if (subscribedOnly) {
+    const result = await sql`SELECT * FROM contacts WHERE subscribed = true ORDER BY created_at DESC`;
+    return result.rows;
+  }
+  const result = await sql`SELECT * FROM contacts ORDER BY created_at DESC`;
+  return result.rows;
+}
+
+export async function getContactStats() {
+  const result = await sql`
+    SELECT
+      COUNT(*) as total,
+      COUNT(*) FILTER (WHERE subscribed = true) as subscribed,
+      COUNT(*) FILTER (WHERE subscribed = false) as unsubscribed,
+      COUNT(*) FILTER (WHERE source = 'website') as from_website,
+      COUNT(*) FILTER (WHERE source = 'manual') as from_manual
+    FROM contacts
+  `;
+  return result.rows[0];
+}
+
+export async function deleteContact(id: number) {
+  await sql`DELETE FROM contacts WHERE id = ${id}`;
+}
+
+export async function unsubscribeContact(email: string) {
+  await sql`UPDATE contacts SET subscribed = false WHERE email = ${email.toLowerCase()}`;
+}
+
+// ─────────────────────────────────────────────────────────────
+//  Campaign Queries
+// ─────────────────────────────────────────────────────────────
+
+export async function createCampaign(data: {
+  name: string;
+  subject: string;
+  bodyHtml: string;
+  bodyText: string;
+}) {
+  const result = await sql`
+    INSERT INTO campaigns (name, subject, body_html, body_text)
+    VALUES (${data.name}, ${data.subject}, ${data.bodyHtml}, ${data.bodyText})
+    RETURNING *
+  `;
+  return result.rows[0];
+}
+
+export async function getCampaigns() {
+  const result = await sql`SELECT * FROM campaigns ORDER BY created_at DESC`;
+  return result.rows;
+}
+
+export async function getCampaignById(id: number) {
+  const result = await sql`SELECT * FROM campaigns WHERE id = ${id}`;
+  return result.rows[0] || null;
+}
+
+export async function updateCampaignStatus(id: number, status: string, stats?: { sent: number; delivered: number; failed: number }) {
+  if (stats) {
+    await sql`
+      UPDATE campaigns SET status = ${status}, total_sent = ${stats.sent}, total_delivered = ${stats.delivered}, total_failed = ${stats.failed}, sent_at = NOW()
+      WHERE id = ${id}
+    `;
+  } else {
+    await sql`UPDATE campaigns SET status = ${status} WHERE id = ${id}`;
+  }
+}
+
+export async function logCampaignSend(data: {
+  campaignId: number;
+  contactId: number;
+  email: string;
+  status: string;
+  resendId?: string;
+  error?: string;
+}) {
+  await sql`
+    INSERT INTO campaign_sends (campaign_id, contact_id, email, status, resend_id, error)
+    VALUES (${data.campaignId}, ${data.contactId}, ${data.email}, ${data.status}, ${data.resendId || null}, ${data.error || null})
+  `;
+}

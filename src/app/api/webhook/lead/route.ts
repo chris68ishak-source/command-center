@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createQuote } from "@/lib/db/queries";
+import { createQuote, createContact } from "@/lib/db/queries";
 
 // POST /api/webhook/lead — receives new leads from the Pro Touch website
 // Called automatically when someone submits the free quote form
@@ -34,6 +34,24 @@ export async function POST(request: NextRequest) {
     });
 
     console.log(`[Webhook] New lead: ${name} — ${service} in ${city} → Quote #${quote.id}`);
+
+    // Auto-add to email contacts list (if they have an email)
+    if (email) {
+      try {
+        await createContact({
+          name: name.trim(),
+          email: email.trim(),
+          phone: phone.trim(),
+          city: (city || "").trim(),
+          source: "website",
+          tags: (service || "").trim(),
+        });
+        console.log(`[Webhook] Contact added to email list: ${email}`);
+      } catch (contactErr) {
+        console.error("[Webhook] Failed to add contact:", contactErr);
+        // Non-blocking — lead is still captured even if contact add fails
+      }
+    }
 
     return NextResponse.json({
       success: true,

@@ -11,6 +11,7 @@ const navItems = [
   { href: "/content", label: "Content", icon: "✍️" },
   { href: "/intel", label: "Intel", icon: "👁️" },
   { href: "/campaign", label: "Campaign", icon: "📅" },
+  { href: "/outreach", label: "Outreach", icon: "📧" },
 ];
 
 export default function Sidebar() {
@@ -46,7 +47,7 @@ export default function Sidebar() {
       <div className="px-5 py-4 border-t border-gray-800">
         <div className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
-          <span className="text-xs text-gray-500">7 agents live</span>
+          <span className="text-xs text-gray-500">8 agents live</span>
         </div>
       </div>
     </aside>

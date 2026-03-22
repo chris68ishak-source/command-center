@@ -73,5 +73,51 @@ export async function initializeDatabase() {
     )
   `;
 
+  // Contacts table — email list for campaigns
+  await sql`
+    CREATE TABLE IF NOT EXISTS contacts (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL,
+      email TEXT NOT NULL UNIQUE,
+      phone TEXT,
+      city TEXT,
+      source TEXT NOT NULL DEFAULT 'manual',
+      tags TEXT DEFAULT '',
+      subscribed BOOLEAN NOT NULL DEFAULT true,
+      created_at TIMESTAMP NOT NULL DEFAULT NOW()
+    )
+  `;
+
+  // Campaigns table — tracks every email blast
+  await sql`
+    CREATE TABLE IF NOT EXISTS campaigns (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL,
+      subject TEXT NOT NULL,
+      body_html TEXT NOT NULL,
+      body_text TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'draft',
+      total_sent INTEGER DEFAULT 0,
+      total_delivered INTEGER DEFAULT 0,
+      total_failed INTEGER DEFAULT 0,
+      sent_at TIMESTAMP,
+      created_at TIMESTAMP NOT NULL DEFAULT NOW()
+    )
+  `;
+
+  // Campaign sends — tracks individual email sends
+  await sql`
+    CREATE TABLE IF NOT EXISTS campaign_sends (
+      id SERIAL PRIMARY KEY,
+      campaign_id INTEGER REFERENCES campaigns(id),
+      contact_id INTEGER REFERENCES contacts(id),
+      email TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      resend_id TEXT,
+      error TEXT,
+      sent_at TIMESTAMP NOT NULL DEFAULT NOW()
+    )
+  `;
+
   return { success: true, message: "Database initialized" };
 }
